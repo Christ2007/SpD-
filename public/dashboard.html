@@ -62,6 +62,27 @@
             </button>
           </form>
         </div>
+
+        <!-- Change Password card -->
+        <div class="card" style="margin-top:1.5rem;">
+          <div class="section-header">
+            <div class="section-title">Cambia <span class="accent">Password</span></div>
+          </div>
+          <div id="pwdAlert" class="alert hidden"></div>
+          <form id="pwdForm">
+            <div class="form-group">
+              <label for="currentPwd">Password Attuale</label>
+              <input type="password" id="currentPwd" required>
+            </div>
+            <div class="form-group">
+              <label for="newPwd">Nuova Password</label>
+              <input type="password" id="newPwd" required>
+            </div>
+            <button type="submit" class="btn btn-ghost btn-full" id="pwdBtn">
+              Aggiorna Password
+            </button>
+          </form>
+        </div>
       </div>
 
       <!-- Right: History -->
@@ -145,6 +166,30 @@
         } finally {
           btn.disabled = false;
           btn.innerHTML = 'Registra';
+        }
+      });
+
+      // Change password form
+      document.getElementById('pwdForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('pwdBtn');
+        const currentPassword = document.getElementById('currentPwd').value;
+        const newPassword = document.getElementById('newPwd').value;
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span>';
+        try {
+          await apiFetch('/auth/change-password', {
+            method: 'POST',
+            body: JSON.stringify({ currentPassword, newPassword })
+          });
+          showAlert('pwdAlert', 'success', '✓ Password aggiornata con successo');
+          document.getElementById('pwdForm').reset();
+        } catch (err) {
+          showAlert('pwdAlert', 'error', '✕ ' + err.message);
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = 'Aggiorna Password';
         }
       });
 
