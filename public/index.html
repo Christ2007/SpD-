@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SpeedDrone — Accesso</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .login-bg {
+      position: fixed; inset: 0; z-index: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(232,33,46,0.07) 0%, transparent 70%),
+                  radial-gradient(ellipse 100% 100% at 0% 100%, rgba(232,33,46,0.05) 0%, transparent 50%);
+    }
+    /* Animated grid lines */
+    .login-bg::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+    .login-card { animation: slideIn 0.4s cubic-bezier(0.16,1,0.3,1); }
+  </style>
+</head>
+<body>
+  <div class="login-bg"></div>
+  <div class="login-page">
+    <div class="login-card">
+      <div class="login-logo">
+        <a class="logo" href="#">Speed<span>Drone</span>&nbsp;↗</a>
+      </div>
+      <p class="login-subtitle">Gestione Ore Progetto</p>
+
+      <div id="alert" class="alert hidden"></div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" placeholder="Inserisci username" autocomplete="username" autofocus required>
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" id="submitBtn">
+          Accedi
+        </button>
+      </form>
+
+      <div class="login-divider"></div>
+      <p style="text-align:center; font-size:0.75rem; color:var(--text-muted);">
+        SpeedDrone Project © 2024 · Accesso riservato ai membri del team
+      </p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    // Redirect if already logged in
+    (function() {
+      const token = getToken();
+      const user = getUser();
+      if (token && user) {
+        window.location = user.isAdmin ? '/admin.html' : '/dashboard.html';
+      }
+    })();
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>';
+
+      try {
+        const data = await apiFetch('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ username, password })
+        });
+        setAuth(data.token, data.user);
+        showAlert('alert', 'success', '✓ Accesso eseguito. Reindirizzamento...');
+        setTimeout(() => {
+          window.location = data.user.isAdmin ? '/admin.html' : '/dashboard.html';
+        }, 600);
+      } catch (err) {
+        showAlert('alert', 'error', '✕ ' + (err.message || 'Credenziali non valide'));
+        btn.disabled = false;
+        btn.innerHTML = 'Accedi';
+      }
+    });
+  </script>
+</body>
+</html>

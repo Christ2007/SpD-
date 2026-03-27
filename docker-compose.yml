@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: speeddrone-hours-app
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      # Change this if you want to use a different MongoDB instance or Docker internal network
+      - MONGO_URI=mongodb://10.0.0.66:27017/speeddrone_hours
+      - JWT_SECRET=speeddrone_secret_key_2024
+    restart: unless-stopped

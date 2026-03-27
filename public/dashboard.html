@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SpeedDrone — Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="bg-pattern"></div>
+
+  <nav class="navbar">
+    <a class="logo" href="#">Speed<span>Drone</span></a>
+    <div class="navbar-right">
+      <span class="nav-user">Benvenuto, <strong id="navUsername">—</strong></span>
+      <button class="btn btn-ghost" id="logoutBtn" style="font-size:0.8rem;padding:0.45rem 0.9rem;">Esci</button>
+    </div>
+  </nav>
+
+  <div class="page">
+    <div class="dashboard-grid animate-in">
+      <!-- Left: Log hours -->
+      <div>
+        <!-- Balance stat -->
+        <div class="stat-card" style="margin-bottom:1.2rem;">
+          <div class="stat-value" id="balanceHours">0.00</div>
+          <div class="stat-unit" style="display:inline">h</div>
+          <div class="stat-label">Ore Totali Accumulate</div>
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.4rem;" id="balanceQuarters">0 quarti d'ora</div>
+        </div>
+
+        <!-- Log form card -->
+        <div class="card card-accent">
+          <div class="section-header">
+            <div class="section-title">Registra <span class="accent">Ore</span></div>
+          </div>
+          <div id="logAlert" class="alert hidden"></div>
+          <form id="logForm">
+            <div class="form-group">
+              <label for="quarters">Quarti d'Ora Lavorati</label>
+              <select id="quarters" name="quarters" required>
+                <option value="">— Seleziona —</option>
+                <option value="1">1 quarto (15 min)</option>
+                <option value="2">2 quarti (30 min)</option>
+                <option value="3">3 quarti (45 min)</option>
+                <option value="4">4 quarti (1 ora)</option>
+                <option value="6">6 quarti (1h 30m)</option>
+                <option value="8">8 quarti (2 ore)</option>
+                <option value="12">12 quarti (3 ore)</option>
+                <option value="16">16 quarti (4 ore)</option>
+                <option value="20">20 quarti (5 ore)</option>
+                <option value="24">24 quarti (6 ore)</option>
+                <option value="32">32 quarti (8 ore)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="description">Descrizione Attività</label>
+              <textarea id="description" name="description" rows="3" placeholder="Cosa hai lavorato? (opzionale)"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-full" id="logBtn">
+              Registra
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Right: History -->
+      <div class="card">
+        <div class="section-header">
+          <div class="section-title">Storico <span class="accent">Attività</span></div>
+          <button class="btn btn-ghost" id="refreshBtn" style="font-size:0.8rem;padding:0.4rem 0.8rem;">↺ Aggiorna</button>
+        </div>
+        <div id="historyList">
+          <div class="empty"><div class="empty-icon">📋</div>Nessuna attività registrata</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    const user = requireAuth(false);
+    if (user) {
+      document.getElementById('navUsername').textContent = user.displayName || user.username;
+
+      // Logout
+      document.getElementById('logoutBtn').addEventListener('click', () => {
+        clearAuth();
+        window.location = '/';
+      });
+
+      // Refresh button
+      document.getElementById('refreshBtn').addEventListener('click', loadData);
+
+      async function loadData() {
+        try {
+          const data = await apiFetch('/hours/my');
+          const q = data.balance || 0;
+          document.getElementById('balanceHours').textContent = hoursFromQuarters(q);
+          document.getElementById('balanceQuarters').textContent = `${q} ${q === 1 ? 'quarto' : 'quarti'} d'ora`;
+
+          const list = document.getElementById('historyList');
+          if (!data.entries || data.entries.length === 0) {
+            list.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>Nessuna attività registrata</div>';
+            return;
+          }
+          list.innerHTML = data.entries.map(e => `
+            <div class="entry-item">
+              <div>
+                <div class="entry-desc">${e.description || '<em style="color:var(--text-muted)">Nessuna descrizione</em>'}</div>
+                <div class="entry-date">${formatDate(e.createdAt)}</div>
+              </div>
+              <div class="entry-time">+${(e.quarters / 4).toFixed(2)}h<br><span style="font-size:0.75rem;color:var(--text-muted);font-family:Inter">${e.quarters} quart${e.quarters === 1 ? 'o' : 'i'}</span></div>
+            </div>
+          `).join('');
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      // Log form
+      document.getElementById('logForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('logBtn');
+        const quarters = document.getElementById('quarters').value;
+        const description = document.getElementById('description').value.trim();
+        if (!quarters) { showAlert('logAlert', 'error', 'Seleziona il numero di quarti'); return; }
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span>';
+        try {
+          const data = await apiFetch('/hours/log', {
+            method: 'POST',
+            body: JSON.stringify({ quarters: Number(quarters), description })
+          });
+          showAlert('logAlert', 'success', `✓ Registrate ${quarters} quarti (${(quarters/4).toFixed(2)}h)`);
+          document.getElementById('logForm').reset();
+          // Update balance instantly
+          const q = data.newBalance || 0;
+          document.getElementById('balanceHours').textContent = hoursFromQuarters(q);
+          document.getElementById('balanceQuarters').textContent = `${q} ${q === 1 ? 'quarto' : 'quarti'} d'ora`;
+          loadData();
+        } catch (err) {
+          showAlert('logAlert', 'error', '✕ ' + err.message);
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = 'Registra';
+        }
+      });
+
+      loadData();
+    }
+  </script>
+</body>
+</html>
