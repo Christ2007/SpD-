@@ -10,8 +10,60 @@ const router = express.Router();
 router.get('/users', verifyToken, requireAdmin, async (req, res) => {
   try {
     const users = await User.find({}).select('-passwordHash').sort({ username: 1 });
-    res.json(users);
+    // front-end expects `balance` property
+    const formatted = users.map(u => ({
+      id: u._id,
+      username: u.username,
+      displayName: u.displayName || u.username,
+      isAdmin: u.isAdmin,
+      balance: u.hoursBalance,
+      hoursBalance: u.hoursBalance
+    }));
+    res.json(formatted);
   } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/admin/users/:id/hours — get per-user entries and balance
+router.get('/users/:id/hours', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('-passwordHash');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const entries = await HoursEntry.find({ userId: user._id }).sort({ createdAt: -1 });
+    res.json({ balance: user.hoursBalance, entries });
+  } catch (err) {
+    console.error('Admin get user hours error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE /api/admin/users/:id/hours/entries — remove selected entries and adjust balance
+router.delete('/users/:id/hours/entries', verifyToken, requireAdmin, async (req, res) => {
+  try {
+    const { entryIds } = req.body;
+    if (!Array.isArray(entryIds) || entryIds.length === 0) {
+      return res.status(400).json({ error: 'entryIds array is required' });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const entries = await HoursEntry.find({ _id: { $in: entryIds }, userId: user._id });
+    const totalRemoved = entries.reduce((sum, e) => sum + e.quarters, 0);
+
+    if (entries.length === 0) {
+      return res.status(404).json({ error: 'No matching entries found' });
+    }
+
+    await HoursEntry.deleteMany({ _id: { $in: entryIds }, userId: user._id });
+    user.hoursBalance = Math.max(0, user.hoursBalance - totalRemoved);
+    await user.save();
+
+    res.json({ message: 'Entries deleted', removedCount: entries.length, newBalance: user.hoursBalance });
+  } catch (err) {
+    console.error('Admin delete entries error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
