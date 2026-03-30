@@ -96,6 +96,50 @@
         </div>
       </div>
     </div>
+
+    <!-- Admin Panel (visible only to admins) -->
+    <div class="card admin-panel" id="adminPanel" style="display:none; margin-top:1.5rem; max-width:1200px; margin-left:auto; margin-right:auto; padding-left:1.5rem; padding-right:1.5rem;">
+      <div class="section-header">
+        <div class="section-title">👑 Admin — <span class="accent">Gestione Ore</span></div>
+        <button class="btn btn-ghost" id="adminRefreshBtn" style="font-size:0.8rem;padding:0.4rem 0.8rem;">↺</button>
+      </div>
+      <div id="adminAlert" class="alert hidden" style="margin-bottom:1rem;"></div>
+      <div id="adminUserList">
+        <div class="empty"><div class="empty-icon">👥</div>Caricamento utenti…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-box">
+      <h3 id="modalTitle">Conferma operazione</h3>
+      <p id="modalBody">Sei sicuro?</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="modalCancel">Annulla</button>
+        <button class="btn btn-danger-solid" id="modalConfirm">Conferma</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Entry-Picker Modal -->
+  <div class="modal-overlay" id="pickerModal">
+    <div class="picker-box">
+      <div class="picker-header">
+        <h3 id="pickerTitle">Seleziona ore da annullare</h3>
+        <label class="picker-select-all">
+          <input type="checkbox" id="pickerSelectAll"> Seleziona tutto
+        </label>
+      </div>
+      <div class="picker-list" id="pickerList"></div>
+      <div class="picker-footer">
+        <div class="picker-summary" id="pickerSummary">Nessuna voce selezionata</div>
+        <div class="picker-actions">
+          <button class="btn btn-ghost" id="pickerCancel">Annulla</button>
+          <button class="btn-danger-solid" id="pickerConfirm" disabled>🗑 Elimina selezionate</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>
@@ -194,6 +238,217 @@
       });
 
       loadData();
+
+      // ── ADMIN PANEL ───────────────────────────────────────────────────────
+      const isAdmin = user.role === 'admin' || user.isAdmin === true;
+
+      if (isAdmin) {
+        document.getElementById('adminPanel').style.display = 'block';
+        document.getElementById('adminRefreshBtn').addEventListener('click', loadAdminUsers);
+        loadAdminUsers();
+      }
+
+      // ── Confirm modal helpers ─────────────────────────────────────────────
+      let _modalResolve = null;
+
+      function showConfirm(title, body) {
+        return new Promise(resolve => {
+          _modalResolve = resolve;
+          document.getElementById('modalTitle').textContent = title;
+          document.getElementById('modalBody').textContent = body;
+          document.getElementById('confirmModal').classList.add('active');
+        });
+      }
+
+      document.getElementById('modalCancel').addEventListener('click', () => {
+        document.getElementById('confirmModal').classList.remove('active');
+        if (_modalResolve) { _modalResolve(false); _modalResolve = null; }
+      });
+
+      document.getElementById('modalConfirm').addEventListener('click', () => {
+        document.getElementById('confirmModal').classList.remove('active');
+        if (_modalResolve) { _modalResolve(true); _modalResolve = null; }
+      });
+
+      async function loadAdminUsers() {
+        const listEl = document.getElementById('adminUserList');
+        listEl.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div>Caricamento…</div>';
+        try {
+          const users = await apiFetch('/admin/users');
+          if (!users || users.length === 0) {
+            listEl.innerHTML = '<div class="empty"><div class="empty-icon">👥</div>Nessun utente trovato</div>';
+            return;
+          }
+          listEl.innerHTML = users.map(u => {
+            const balance = u.balance ?? u.hoursBalance ?? 0;
+            const hrs = (balance / 4).toFixed(2);
+            return `
+              <div class="admin-user-card" id="auc-${u.id}">
+                <div class="admin-user-info">
+                  <div class="admin-user-name">${u.displayName || u.username}</div>
+                  <div class="admin-user-balance" id="bal-${u.id}">
+                    ${hrs}h &nbsp;·&nbsp; ${balance} quart${balance === 1 ? 'o' : 'i'}
+                  </div>
+                </div>
+                <div class="admin-user-actions">
+                  <button
+                    class="btn-danger"
+                    onclick="openEntryPicker('${u.id}', '${(u.displayName || u.username).replace(/'/g, "\\'")}' )"
+                    id="manageBtn-${u.id}"
+                  >
+                    ✎ Gestisci ore
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('');
+        } catch (err) {
+          listEl.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div>${err.message}</div>`;
+        }
+      }
+
+      // ── Entry Picker ──────────────────────────────────────────────────────
+      let _pickerUserId   = null;
+      let _pickerUserName = null;
+      let _pickerEntries  = [];
+
+      window.openEntryPicker = async function(userId, userName) {
+        _pickerUserId   = userId;
+        _pickerUserName = userName;
+        _pickerEntries  = [];
+
+        const listEl = document.getElementById('pickerList');
+        document.getElementById('pickerTitle').textContent = `Ore di ${userName}`;
+        document.getElementById('pickerSummary').innerHTML = 'Caricamento…';
+        document.getElementById('pickerConfirm').disabled = true;
+        document.getElementById('pickerSelectAll').checked = false;
+        listEl.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div>Caricamento voci…</div>';
+        document.getElementById('pickerModal').classList.add('active');
+
+        try {
+          const data = await apiFetch(`/admin/users/${userId}/hours`);
+          _pickerEntries = (data.entries || []).slice().reverse();
+
+          if (_pickerEntries.length === 0) {
+            listEl.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>Nessuna voce registrata</div>';
+            document.getElementById('pickerSummary').innerHTML = '0 voci';
+            return;
+          }
+
+          renderPickerEntries();
+        } catch (err) {
+          listEl.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div>${err.message}</div>`;
+          document.getElementById('pickerSummary').innerHTML = 'Errore nel caricamento';
+        }
+      };
+
+      function renderPickerEntries() {
+        const listEl = document.getElementById('pickerList');
+        listEl.innerHTML = _pickerEntries.map((e) => `
+          <label class="picker-entry" id="pe-${e._id || e.id}" onclick="toggleEntry(event, '${e._id || e.id}')">
+            <input type="checkbox" id="chk-${e._id || e.id}" value="${e._id || e.id}" onchange="updatePickerSummary()">
+            <div class="picker-entry-desc">
+              <div>${e.description || '<em style="color:var(--text-muted)">Nessuna descrizione</em>'}</div>
+              <div class="picker-entry-date">${formatDate(e.createdAt)}</div>
+            </div>
+            <div class="picker-entry-hours">
+              +${(e.quarters / 4).toFixed(2)}h<br>
+              <span style="font-size:0.72rem;font-weight:400;color:var(--text-muted)">${e.quarters} quart${e.quarters===1?'o':'i'}</span>
+            </div>
+          </label>
+        `).join('');
+        updatePickerSummary();
+      }
+
+      window.toggleEntry = function(event, entryId) {
+        if (event.target.tagName === 'INPUT') return;
+        const chk = document.getElementById(`chk-${entryId}`);
+        chk.checked = !chk.checked;
+        updatePickerSummary();
+      };
+
+      window.updatePickerSummary = function() {
+        const checked = [...document.querySelectorAll('#pickerList input[type="checkbox"]:checked')];
+        const totalQ  = checked.reduce((sum, chk) => {
+          const entry = _pickerEntries.find(e => (e._id || e.id) == chk.value);
+          return sum + (entry ? entry.quarters : 0);
+        }, 0);
+
+        _pickerEntries.forEach(e => {
+          const id  = e._id || e.id;
+          const row = document.getElementById(`pe-${id}`);
+          const chk = document.getElementById(`chk-${id}`);
+          if (row) row.classList.toggle('selected', chk && chk.checked);
+        });
+
+        const total  = _pickerEntries.length;
+        const selAll = document.getElementById('pickerSelectAll');
+        selAll.indeterminate = checked.length > 0 && checked.length < total;
+        selAll.checked = checked.length === total && total > 0;
+
+        const btn = document.getElementById('pickerConfirm');
+        if (checked.length === 0) {
+          document.getElementById('pickerSummary').innerHTML = 'Nessuna voce selezionata';
+          btn.disabled = true;
+        } else {
+          document.getElementById('pickerSummary').innerHTML =
+            `<strong>${checked.length}</strong> voci selezionate &nbsp;·&nbsp; <strong>${(totalQ/4).toFixed(2)}h</strong> (${totalQ} quarti)`;
+          btn.disabled = false;
+        }
+      };
+
+      document.getElementById('pickerSelectAll').addEventListener('change', function() {
+        document.querySelectorAll('#pickerList input[type="checkbox"]').forEach(chk => {
+          chk.checked = this.checked;
+        });
+        updatePickerSummary();
+      });
+
+      document.getElementById('pickerCancel').addEventListener('click', () => {
+        document.getElementById('pickerModal').classList.remove('active');
+      });
+
+      document.getElementById('pickerConfirm').addEventListener('click', async () => {
+        const checked = [...document.querySelectorAll('#pickerList input[type="checkbox"]:checked')];
+        if (checked.length === 0) return;
+
+        const entryIds = checked.map(chk => chk.value);
+        const totalQ   = checked.reduce((sum, chk) => {
+          const entry = _pickerEntries.find(e => (e._id || e.id) == chk.value);
+          return sum + (entry ? entry.quarters : 0);
+        }, 0);
+
+        const confirmed = await showConfirm(
+          'Conferma eliminazione',
+          `Eliminare ${checked.length} voci (${(totalQ/4).toFixed(2)}h) di ${_pickerUserName}?`
+        );
+        if (!confirmed) return;
+
+        const btn = document.getElementById('pickerConfirm');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span>';
+
+        try {
+          const data = await apiFetch(`/admin/users/${_pickerUserId}/hours/entries`, {
+            method: 'DELETE',
+            body: JSON.stringify({ entryIds })
+          });
+
+          const newQ  = data.newBalance ?? 0;
+          const balEl = document.getElementById(`bal-${_pickerUserId}`);
+          if (balEl) balEl.textContent = `${(newQ/4).toFixed(2)}h · ${newQ} quart${newQ===1?'o':'i'}`;
+
+          showAlert('adminAlert', 'success',
+            `✓ Eliminate ${checked.length} voci di ${_pickerUserName} (−${(totalQ/4).toFixed(2)}h)`);
+
+          document.getElementById('pickerModal').classList.remove('active');
+        } catch (err) {
+          showAlert('adminAlert', 'error', `✕ ${err.message}`);
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = '🗑 Elimina selezionate';
+        }
+      });
     }
   </script>
 </body>

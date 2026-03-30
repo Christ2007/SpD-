@@ -1,28 +1,88 @@
-        <div class="card admin-panel" id="adminPanel" style="display:none; margin-top:1.5rem;">
-          <div class="section-header">
-            <div class="section-title">👑 Admin — <span class="accent">Gestione Ore</span></div>
-            <button class="btn btn-ghost" id="adminRefreshBtn" style="font-size:0.8rem;padding:0.4rem 0.8rem;">↺</button>
-          </div>
-          <div id="adminAlert" class="alert hidden" style="margin-bottom:1rem;"></div>
-          <div id="adminUserList">
-            <div class="empty"><div class="empty-icon">👥</div>Caricamento utenti…</div>
-          </div>
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SpeedDrone — Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="bg-pattern"></div>
+
+  <nav class="navbar">
+    <a class="logo" href="/dashboard.html">Speed<span>Drone</span></a>
+    <div class="navbar-right">
+      <span class="nav-user">👑 Admin: <strong id="navUsername">—</strong></span>
+      <a class="btn btn-ghost" href="/dashboard.html" style="font-size:0.8rem;padding:0.45rem 0.9rem;">Dashboard</a>
+      <button class="btn btn-ghost" id="logoutBtn" style="font-size:0.8rem;padding:0.45rem 0.9rem;">Esci</button>
+    </div>
+  </nav>
+
+  <div class="page">
+    <div class="admin-container">
+
+      <!-- Stats row -->
+      <div class="stats-row" id="statsRow">
+        <div class="stat-card">
+          <div class="stat-value" id="statUsers">—</div>
+          <div class="stat-label">Utenti Totali</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statHours">—</div>
+          <div class="stat-unit" style="display:inline">h</div>
+          <div class="stat-label">Ore Totali Accumulate</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statEntries">—</div>
+          <div class="stat-label">Registrazioni Totali</div>
         </div>
       </div>
- 
-      <!-- Right: History -->
-      <div class="card">
-        <div class="section-header">
-          <div class="section-title">Storico <span class="accent">Attività</span></div>
-          <button class="btn btn-ghost" id="refreshBtn" style="font-size:0.8rem;padding:0.4rem 0.8rem;">↺ Aggiorna</button>
+
+      <div class="admin-grid">
+
+        <!-- Left: Create user -->
+        <div>
+          <div class="card card-accent">
+            <div class="section-header">
+              <div class="section-title">Crea <span class="accent">Utente</span></div>
+            </div>
+            <div id="createAlert" class="alert hidden"></div>
+            <form id="createForm">
+              <div class="form-group">
+                <label for="newUsername">Username</label>
+                <input type="text" id="newUsername" placeholder="es. mario.rossi" required autocomplete="off">
+              </div>
+              <div class="form-group">
+                <label for="newDisplayName">Nome Visualizzato</label>
+                <input type="text" id="newDisplayName" placeholder="es. Mario Rossi">
+              </div>
+              <div class="form-group">
+                <label for="newPassword">Password</label>
+                <input type="password" id="newPassword" required autocomplete="new-password">
+              </div>
+              <button type="submit" class="btn btn-primary btn-full" id="createBtn">
+                Crea Utente
+              </button>
+            </form>
+          </div>
         </div>
-        <div id="historyList">
-          <div class="empty"><div class="empty-icon">📋</div>Nessuna attività registrata</div>
+
+        <!-- Right: User list -->
+        <div class="card">
+          <div class="section-header">
+            <div class="section-title">Utenti <span class="accent">Registrati</span></div>
+            <button class="btn btn-ghost" id="refreshBtn" style="font-size:0.8rem;padding:0.4rem 0.8rem;">↺ Aggiorna</button>
+          </div>
+          <div id="globalAlert" class="alert hidden" style="margin-bottom:1rem;"></div>
+          <div id="userList">
+            <div class="empty"><div class="empty-icon">⏳</div>Caricamento utenti…</div>
+          </div>
         </div>
+
       </div>
     </div>
   </div>
- 
+
   <!-- Confirm Modal -->
   <div class="modal-overlay" id="confirmModal">
     <div class="modal-box">
@@ -30,11 +90,11 @@
       <p id="modalBody">Sei sicuro?</p>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="modalCancel">Annulla</button>
-        <button class="btn btn-danger" id="modalConfirm">Conferma</button>
+        <button class="btn-danger-solid" id="modalConfirm">Conferma</button>
       </div>
     </div>
   </div>
- 
+
   <!-- Entry-Picker Modal -->
   <div class="modal-overlay" id="pickerModal">
     <div class="picker-box">
@@ -49,30 +109,27 @@
         <div class="picker-summary" id="pickerSummary">Nessuna voce selezionata</div>
         <div class="picker-actions">
           <button class="btn btn-ghost" id="pickerCancel">Annulla</button>
-          <button class="btn-danger" id="pickerConfirm" disabled>🗑 Elimina selezionate</button>
+          <button class="btn-danger-solid" id="pickerConfirm" disabled>🗑 Elimina selezionate</button>
         </div>
       </div>
     </div>
   </div>
- 
+
   <script src="app.js"></script>
   <script>
-    const user = requireAuth(false);
+    const user = requireAuth(true); // admin only — redirects non-admins to /dashboard.html
+
     if (user) {
       document.getElementById('navUsername').textContent = user.displayName || user.username;
- 
-      // Logout
+
       document.getElementById('logoutBtn').addEventListener('click', () => {
         clearAuth();
         window.location = '/';
       });
- 
-      // Refresh button
-      document.getElementById('refreshBtn').addEventListener('click', loadData);
- 
-      // ── Confirm modal helpers ──────────────────────────────────────────────
+
+      // ── Confirm modal ──────────────────────────────────────────────────────
       let _modalResolve = null;
- 
+
       function showConfirm(title, body) {
         return new Promise(resolve => {
           _modalResolve = resolve;
@@ -81,234 +138,206 @@
           document.getElementById('confirmModal').classList.add('active');
         });
       }
- 
+
       document.getElementById('modalCancel').addEventListener('click', () => {
         document.getElementById('confirmModal').classList.remove('active');
         if (_modalResolve) { _modalResolve(false); _modalResolve = null; }
       });
- 
+
       document.getElementById('modalConfirm').addEventListener('click', () => {
         document.getElementById('confirmModal').classList.remove('active');
         if (_modalResolve) { _modalResolve(true); _modalResolve = null; }
       });
- 
-      // ── My data ───────────────────────────────────────────────────────────
-      async function loadData() {
-        try {
-          const data = await apiFetch('/hours/my');
-          const q = data.balance || 0;
-          document.getElementById('balanceHours').textContent = hoursFromQuarters(q);
-          document.getElementById('balanceQuarters').textContent = `${q} ${q === 1 ? 'quarto' : 'quarti'} d'ora`;
- 
-          const list = document.getElementById('historyList');
-          if (!data.entries || data.entries.length === 0) {
-            list.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>Nessuna attività registrata</div>';
-            return;
-          }
-          list.innerHTML = data.entries.map(e => `
-            <div class="entry-item">
-              <div>
-                <div class="entry-desc">${e.description || '<em style="color:var(--text-muted)">Nessuna descrizione</em>'}</div>
-                <div class="entry-date">${formatDate(e.createdAt)}</div>
-              </div>
-              <div class="entry-time">+${(e.quarters / 4).toFixed(2)}h<br><span style="font-size:0.75rem;color:var(--text-muted);font-family:Inter">${e.quarters} quart${e.quarters === 1 ? 'o' : 'i'}</span></div>
-            </div>
-          `).join('');
-        } catch (err) {
-          console.error(err);
-        }
-      }
- 
-      // Log form
-      document.getElementById('logForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('logBtn');
-        const quarters = document.getElementById('quarters').value;
-        const description = document.getElementById('description').value.trim();
-        if (!quarters) { showAlert('logAlert', 'error', 'Seleziona il numero di quarti'); return; }
- 
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner"></span>';
-        try {
-          const data = await apiFetch('/hours/log', {
-            method: 'POST',
-            body: JSON.stringify({ quarters: Number(quarters), description })
-          });
-          showAlert('logAlert', 'success', `✓ Registrate ${quarters} quarti (${(quarters/4).toFixed(2)}h)`);
-          document.getElementById('logForm').reset();
-          const q = data.newBalance || 0;
-          document.getElementById('balanceHours').textContent = hoursFromQuarters(q);
-          document.getElementById('balanceQuarters').textContent = `${q} ${q === 1 ? 'quarto' : 'quarti'} d'ora`;
-          loadData();
-        } catch (err) {
-          showAlert('logAlert', 'error', '✕ ' + err.message);
-        } finally {
-          btn.disabled = false;
-          btn.innerHTML = 'Registra';
-        }
-      });
- 
-      // Change password form
-      document.getElementById('pwdForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('pwdBtn');
-        const currentPassword = document.getElementById('currentPwd').value;
-        const newPassword = document.getElementById('newPwd').value;
- 
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner"></span>';
-        try {
-          await apiFetch('/auth/change-password', {
-            method: 'POST',
-            body: JSON.stringify({ currentPassword, newPassword })
-          });
-          showAlert('pwdAlert', 'success', '✓ Password aggiornata con successo');
-          document.getElementById('pwdForm').reset();
-        } catch (err) {
-          showAlert('pwdAlert', 'error', '✕ ' + err.message);
-        } finally {
-          btn.disabled = false;
-          btn.innerHTML = 'Aggiorna Password';
-        }
-      });
- 
-      // ── ADMIN PANEL ───────────────────────────────────────────────────────
-      const isAdmin = user.role === 'admin' || user.isAdmin === true;
- 
-      if (isAdmin) {
-        document.getElementById('adminPanel').style.display = 'block';
-        document.getElementById('adminRefreshBtn').addEventListener('click', loadAdminUsers);
-        loadAdminUsers();
-      }
- 
-      async function loadAdminUsers() {
-        const listEl = document.getElementById('adminUserList');
+
+      // ── Load users ────────────────────────────────────────────────────────
+      async function loadUsers() {
+        const listEl = document.getElementById('userList');
         listEl.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div>Caricamento…</div>';
         try {
-          // Fetches all users with their hour balances
-          // Expected response: [ { id, username, displayName, balance (quarters) }, … ]
           const users = await apiFetch('/admin/users');
- 
+
+          // Update stats
+          const totalQ = users.reduce((s, u) => s + (u.hoursBalance ?? u.balance ?? 0), 0);
+          document.getElementById('statUsers').textContent   = users.length;
+          document.getElementById('statHours').textContent   = hoursFromQuarters(totalQ);
+
           if (!users || users.length === 0) {
             listEl.innerHTML = '<div class="empty"><div class="empty-icon">👥</div>Nessun utente trovato</div>';
             return;
           }
- 
+
           listEl.innerHTML = users.map(u => {
             const balance = u.balance ?? u.hoursBalance ?? 0;
             const hrs = (balance / 4).toFixed(2);
+            const isAdminUser = u.isAdmin;
             return `
               <div class="admin-user-card" id="auc-${u.id}">
                 <div class="admin-user-info">
-                  <div class="admin-user-name">${u.displayName || u.username}</div>
+                  <div class="admin-user-name">
+                    ${u.displayName || u.username}
+                    ${isAdminUser ? '<span class="badge badge-red" style="margin-left:0.4rem;">admin</span>' : ''}
+                  </div>
+                  <div class="admin-user-meta">@${u.username}</div>
                   <div class="admin-user-balance" id="bal-${u.id}">
                     ${hrs}h &nbsp;·&nbsp; ${balance} quart${balance === 1 ? 'o' : 'i'}
                   </div>
                 </div>
                 <div class="admin-user-actions">
                   <button
-                    class="btn-danger"
-                    onclick="openEntryPicker('${u.id}', '${(u.displayName || u.username).replace(/'/g,"\\'")}' )"
+                    class="btn btn-ghost"
+                    style="font-size:0.8rem;padding:0.4rem 0.75rem;"
+                    onclick="openEntryPicker('${u.id}', '${(u.displayName || u.username).replace(/'/g, "\\'")}')"
                     id="manageBtn-${u.id}"
                   >
                     ✎ Gestisci ore
                   </button>
+                  ${!isAdminUser ? `
+                  <button
+                    class="btn-danger"
+                    style="margin-left:0.4rem;"
+                    onclick="deleteUser('${u.id}', '${(u.displayName || u.username).replace(/'/g, "\\'")}')"
+                  >
+                    🗑
+                  </button>` : ''}
                 </div>
               </div>
             `;
           }).join('');
- 
+
+          // Load entry count for stats
+          try {
+            const entries = await apiFetch('/admin/entries');
+            document.getElementById('statEntries').textContent = entries.length;
+          } catch { document.getElementById('statEntries').textContent = '—'; }
+
         } catch (err) {
           listEl.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div>${err.message}</div>`;
         }
       }
- 
+
+      document.getElementById('refreshBtn').addEventListener('click', loadUsers);
+
+      // ── Delete user ───────────────────────────────────────────────────────
+      window.deleteUser = async function(userId, userName) {
+        const ok = await showConfirm('Elimina utente', `Eliminare definitivamente ${userName} e tutte le sue ore?`);
+        if (!ok) return;
+        try {
+          await apiFetch(`/admin/users/${userId}`, { method: 'DELETE' });
+          showAlert('globalAlert', 'success', `✓ Utente ${userName} eliminato`);
+          loadUsers();
+        } catch (err) {
+          showAlert('globalAlert', 'error', '✕ ' + err.message);
+        }
+      };
+
+      // ── Create user form ──────────────────────────────────────────────────
+      document.getElementById('createForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('createBtn');
+        const username    = document.getElementById('newUsername').value.trim();
+        const displayName = document.getElementById('newDisplayName').value.trim();
+        const password    = document.getElementById('newPassword').value;
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span>';
+        try {
+          await apiFetch('/admin/users', {
+            method: 'POST',
+            body: JSON.stringify({ username, displayName, password })
+          });
+          showAlert('createAlert', 'success', `✓ Utente "${displayName || username}" creato`);
+          document.getElementById('createForm').reset();
+          loadUsers();
+        } catch (err) {
+          showAlert('createAlert', 'error', '✕ ' + err.message);
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = 'Crea Utente';
+        }
+      });
+
       // ── Entry Picker ──────────────────────────────────────────────────────
       let _pickerUserId   = null;
       let _pickerUserName = null;
-      let _pickerEntries  = [];   // full entry objects fetched for the current user
- 
-      /**
-       * Open the entry-picker modal for a given user.
-       * Fetches their entries from GET /admin/users/:id/hours
-       * Expected response: { balance, entries: [{ id, quarters, description, createdAt }] }
-       */
+      let _pickerEntries  = [];
+
       window.openEntryPicker = async function(userId, userName) {
         _pickerUserId   = userId;
         _pickerUserName = userName;
         _pickerEntries  = [];
- 
+
         const listEl = document.getElementById('pickerList');
-        document.getElementById('pickerTitle').textContent = `Ore di ${userName}`;
-        document.getElementById('pickerSummary').innerHTML = 'Caricamento…';
-        document.getElementById('pickerConfirm').disabled = true;
-        document.getElementById('pickerSelectAll').checked = false;
+        document.getElementById('pickerTitle').textContent       = `Ore di ${userName}`;
+        document.getElementById('pickerSummary').innerHTML       = 'Caricamento…';
+        document.getElementById('pickerConfirm').disabled        = true;
+        document.getElementById('pickerSelectAll').checked       = false;
+        document.getElementById('pickerSelectAll').indeterminate = false;
         listEl.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div>Caricamento voci…</div>';
         document.getElementById('pickerModal').classList.add('active');
- 
+
         try {
           const data = await apiFetch(`/admin/users/${userId}/hours`);
-          _pickerEntries = (data.entries || []).slice().reverse(); // most recent first
- 
+          _pickerEntries = (data.entries || []).slice().reverse(); // newest first
+
           if (_pickerEntries.length === 0) {
             listEl.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>Nessuna voce registrata</div>';
             document.getElementById('pickerSummary').innerHTML = '0 voci';
             return;
           }
- 
           renderPickerEntries();
         } catch (err) {
           listEl.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div>${err.message}</div>`;
           document.getElementById('pickerSummary').innerHTML = 'Errore nel caricamento';
         }
       };
- 
+
       function renderPickerEntries() {
         const listEl = document.getElementById('pickerList');
-        listEl.innerHTML = _pickerEntries.map((e, i) => `
-          <label class="picker-entry" id="pe-${e.id}" onclick="toggleEntry(event, '${e.id}')">
-            <input type="checkbox" id="chk-${e.id}" value="${e.id}" onchange="updatePickerSummary()">
-            <div class="picker-entry-desc">
-              <div>${e.description || '<em style="color:var(--text-muted)">Nessuna descrizione</em>'}</div>
-              <div class="picker-entry-date">${formatDate(e.createdAt)}</div>
-            </div>
-            <div class="picker-entry-hours">
-              +${(e.quarters / 4).toFixed(2)}h<br>
-              <span style="font-size:0.72rem;font-weight:400;color:var(--text-muted)">${e.quarters} quart${e.quarters===1?'o':'i'}</span>
-            </div>
-          </label>
-        `).join('');
+        listEl.innerHTML = _pickerEntries.map(e => {
+          const id = e._id || e.id;
+          return `
+            <label class="picker-entry" id="pe-${id}" onclick="toggleEntry(event,'${id}')">
+              <input type="checkbox" id="chk-${id}" value="${id}" onchange="updatePickerSummary()">
+              <div class="picker-entry-desc">
+                <div>${e.description || '<em style="color:var(--text-muted)">Nessuna descrizione</em>'}</div>
+                <div class="picker-entry-date">${formatDate(e.createdAt)}</div>
+              </div>
+              <div class="picker-entry-hours">
+                +${(e.quarters / 4).toFixed(2)}h<br>
+                <span style="font-size:0.72rem;font-weight:400;color:var(--text-muted)">${e.quarters} quart${e.quarters===1?'o':'i'}</span>
+              </div>
+            </label>
+          `;
+        }).join('');
         updatePickerSummary();
       }
- 
+
       window.toggleEntry = function(event, entryId) {
-        // Avoid double-firing when clicking directly on the checkbox
         if (event.target.tagName === 'INPUT') return;
         const chk = document.getElementById(`chk-${entryId}`);
         chk.checked = !chk.checked;
         updatePickerSummary();
       };
- 
+
       window.updatePickerSummary = function() {
         const checked = [...document.querySelectorAll('#pickerList input[type="checkbox"]:checked')];
         const totalQ  = checked.reduce((sum, chk) => {
-          const entry = _pickerEntries.find(e => e.id == chk.value);
+          const entry = _pickerEntries.find(e => (e._id || e.id) == chk.value);
           return sum + (entry ? entry.quarters : 0);
         }, 0);
- 
-        // Highlight selected rows
+
         _pickerEntries.forEach(e => {
-          const row = document.getElementById(`pe-${e.id}`);
-          const chk = document.getElementById(`chk-${e.id}`);
+          const id  = e._id || e.id;
+          const row = document.getElementById(`pe-${id}`);
+          const chk = document.getElementById(`chk-${id}`);
           if (row) row.classList.toggle('selected', chk && chk.checked);
         });
- 
-        // Update select-all checkbox state
-        const total = _pickerEntries.length;
+
+        const total  = _pickerEntries.length;
         const selAll = document.getElementById('pickerSelectAll');
         selAll.indeterminate = checked.length > 0 && checked.length < total;
         selAll.checked = checked.length === total && total > 0;
- 
+
         const btn = document.getElementById('pickerConfirm');
         if (checked.length === 0) {
           document.getElementById('pickerSummary').innerHTML = 'Nessuna voce selezionata';
@@ -319,66 +348,63 @@
           btn.disabled = false;
         }
       };
- 
-      // Select-all toggle
+
       document.getElementById('pickerSelectAll').addEventListener('change', function() {
         document.querySelectorAll('#pickerList input[type="checkbox"]').forEach(chk => {
           chk.checked = this.checked;
         });
         updatePickerSummary();
       });
- 
-      // Close picker
+
       document.getElementById('pickerCancel').addEventListener('click', () => {
         document.getElementById('pickerModal').classList.remove('active');
       });
- 
-      // Confirm deletion of selected entries
+
       document.getElementById('pickerConfirm').addEventListener('click', async () => {
         const checked = [...document.querySelectorAll('#pickerList input[type="checkbox"]:checked')];
         if (checked.length === 0) return;
- 
+
         const entryIds = checked.map(chk => chk.value);
         const totalQ   = checked.reduce((sum, chk) => {
-          const entry = _pickerEntries.find(e => e.id == chk.value);
+          const entry = _pickerEntries.find(e => (e._id || e.id) == chk.value);
           return sum + (entry ? entry.quarters : 0);
         }, 0);
- 
+
         const confirmed = await showConfirm(
           'Conferma eliminazione',
           `Eliminare ${checked.length} voci (${(totalQ/4).toFixed(2)}h) di ${_pickerUserName}?`
         );
         if (!confirmed) return;
- 
+
         const btn = document.getElementById('pickerConfirm');
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner"></span>';
- 
+
         try {
-          // DELETE /admin/users/:id/hours/entries  { entryIds: [...] }
           const data = await apiFetch(`/admin/users/${_pickerUserId}/hours/entries`, {
             method: 'DELETE',
             body: JSON.stringify({ entryIds })
           });
- 
-          // Update balance label in the user list
-          const newQ = data.newBalance ?? 0;
+
+          // Update balance in user list
+          const newQ  = data.newBalance ?? 0;
           const balEl = document.getElementById(`bal-${_pickerUserId}`);
           if (balEl) balEl.textContent = `${(newQ/4).toFixed(2)}h · ${newQ} quart${newQ===1?'o':'i'}`;
- 
-          showAlert('adminAlert', 'success',
+
+          showAlert('globalAlert', 'success',
             `✓ Eliminate ${checked.length} voci di ${_pickerUserName} (−${(totalQ/4).toFixed(2)}h)`);
- 
+
           document.getElementById('pickerModal').classList.remove('active');
         } catch (err) {
-          showAlert('adminAlert', 'error', `✕ ${err.message}`);
+          showAlert('globalAlert', 'error', `✕ ${err.message}`);
         } finally {
           btn.disabled = false;
           btn.innerHTML = '🗑 Elimina selezionate';
         }
       });
- 
-      loadData();
+
+      // Initial load
+      loadUsers();
     }
   </script>
 </body>
