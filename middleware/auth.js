@@ -20,4 +20,11 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-module.exports = { verifyToken, requireAdmin, JWT_SECRET };
+function requireDoc(req, res, next) {
+  if (!req.user || (!req.user.isDoc && !req.user.isAdmin)) {
+    return res.status(403).json({ error: 'Doc access required' });
+  }
+  next();
+}
+
+module.exports = { verifyToken, requireAdmin, requireDoc, JWT_SECRET };

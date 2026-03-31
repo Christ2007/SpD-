@@ -18,6 +18,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/hours', require('./routes/hours'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/doc', require('./routes/doc'));
 
 // Serve frontend for all other routes
 app.get('*', (req, res) => {

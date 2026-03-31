@@ -16,6 +16,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isDoc: {
+    type: Boolean,
+    default: false
+  },
   hoursBalance: {
     type: Number,
     default: 0  // stored in quarter-hours
